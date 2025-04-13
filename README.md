@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 Breast Cancer Classification Using Machine Learning
 Overview
 This project focuses on classifying breast cancer cases as benign or malignant using the Wisconsin Breast Cancer Dataset (WBCD) from the UCI Machine Learning Repository. The dataset contains 569 samples with 30 features, and the project employs machine learning models to achieve high classification accuracy, with a particular emphasis on recall to minimize false negatives in a medical context. The project includes data preprocessing, feature selection, model training, hyperparameter tuning, and a Streamlit web application for interactive predictions.
@@ -110,3 +111,34 @@ Libraries: scikit-learn, XGBoost, Streamlit, pandas, matplotlib, seaborn
 Inspiration: Research on ML for medical diagnosis
 Contact
 For questions, reach out to adityamishra7990@gmail.com or open an issue on GitHub.
+=======
+# 🩺 Breast Cancer Prediction App 🚀  
+This project is a **Machine Learning-powered Web App** that predicts whether a breast tumor is **Benign (Non-Cancerous)** or **Malignant (Cancerous)** based on clinical data.  
+
+🔗 **Live App:** [Click here to access the app](https://your-streamlit-app-link.com) *(Update after deployment)*  
+
+---
+
+## 📊 **Project Overview**
+Breast cancer is a leading cause of mortality in women. Early detection through **Machine Learning** can help in timely treatment. This app allows users to input tumor characteristics and get an instant prediction.  
+
+✅ **Trained on the Breast Cancer Wisconsin Dataset (569 samples, 30 features).**  
+✅ **Best model: Logistic Regression (Tuned) with 99.12% accuracy.**  
+✅ **Web app built using `Streamlit` and deployed on Streamlit Cloud.**  
+
+---
+
+## 🛠 **Tech Stack**
+- **Programming Language:** Python 🐍  
+- **Machine Learning:** `Scikit-Learn`, `Logistic Regression`  
+- **Web Framework:** `Streamlit`  
+- **Deployment:** `Streamlit Cloud`, `GitHub`  
+
+---
+
+## 📌 **How to Run the Project Locally?**
+### **1️⃣ Clone the Repository**
+```bash
+git clone https://github.com/your-username/Breast_Cancer_Prediction.git
+cd Breast_Cancer_Prediction
+>>>>>>> bda0e1936681376fafd9e9672eda759217d5f032
