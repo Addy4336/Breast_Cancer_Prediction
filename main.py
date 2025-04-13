@@ -3,236 +3,136 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 import seaborn as sns
 import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, classification_report, roc_auc_score
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from xgboost import XGBClassifier
-from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import (accuracy_score, roc_auc_score, classification_report,
+                             precision_score, recall_score, f1_score, matthews_corrcoef,
+                             confusion_matrix, roc_curve, auc)
+import pickle
+import shap
 import warnings
+
 warnings.filterwarnings("ignore")
-df = pd.read_csv (r"C:\Users\lenovo\Downloads\data.csv")
-# df.info()
-# print (df.head())
 
-# Drop unnecessary columns
+
+df = pd.read_csv(r"C:\Users\lenovo\PycharmProjects\Breast_Cancer_Prediction\Dataset\data.csv")
 df.drop(columns=["id", "Unnamed: 32"], inplace=True)
-# df.info()
+df["diagnosis"] = df["diagnosis"].map({"M": 1, "B": 0})
+print("Missing Values:", df.isnull().sum().sum())
 
-df["diagnosis"] = df["diagnosis"].map({"M":1,"B": 0})
-
-print ("Missing Values:", df.isnull().sum().sum())
-
-X= df.drop(columns = ["diagnosis"])
+X = df.drop(columns=["diagnosis"])
 Y = df["diagnosis"]
 
-# Standardize features
+
 scaler = StandardScaler()
 X_Scaled = scaler.fit_transform(X)
-
-# Convert into Dataframe
-X_Scaled_Df = pd.DataFrame(X_Scaled,columns= X.columns)
-
+X_Scaled_Df = pd.DataFrame(X_Scaled, columns=X.columns)
 
 print("Dataset shape after preprocessing:", X_Scaled_Df.shape)
-
-# # Plot class distribution
-# plt.figure(figsize=(6, 4))
-# sns.countplot(X=Y, palette=["green", "red"])
-# plt.title("Class Distribution: Benign vs Malignant", fontsize=14)
-# plt.xlabel("Diagnosis (0 = Benign, 1 = Malignant)", fontsize=12)
-# plt.ylabel("Count", fontsize=12)
-#plt.show()
-
-# Print value counts
 print("Class distribution:\n", Y.value_counts())
 
+
 corr_matrix = df.corr()
-
-# Plot heatmap
-# plt.figure(figsize=(12, 10))
-# sns.heatmap(corr_matrix, cmap="coolwarm", annot=False, linewidths=0.5)
-# plt.title("Feature Correlation Heatmap", fontsize=14)
-# plt.show()
-
-# Get correlation with the target variable
 corr_with_target = corr_matrix["diagnosis"].abs().sort_values(ascending=False)
+top_10_features = corr_with_target[1:11].index.tolist()
 print("Top 10 features correlated with diagnosis:", corr_with_target[1:11])
 
-X_train,X_test, Y_train,Y_test = train_test_split(X_Scaled_Df,Y, test_size = 0.2, random_state= 42)
+X_Scaled_Df_Top10 = X_Scaled_Df[top_10_features]
+X_train, X_test, Y_train, Y_test = train_test_split(X_Scaled_Df_Top10, Y, test_size=0.2, random_state=42)
 print(f"Training set: {X_train.shape}, Testing set: {X_test.shape}")
 
-# Applying logistic Regression
-LR_Model = LogisticRegression()
-LR_Model.fit (X_train, Y_train)
-
-# Prediction using the model
-Y_Pred_LR = LR_Model.predict(X_test)
 
 
-# Model evaluation
-print("Logistic Regression Results:")
-print("Accuracy:", accuracy_score(Y_test, Y_Pred_LR))
-print("ROC-AUC Score:", roc_auc_score(Y_test, Y_Pred_LR))
-print(classification_report(Y_test, Y_Pred_LR))
+def evaluate_model(model, X_test, Y_test, model_name):
+    Y_pred = model.predict(X_test)
+    Y_prob = model.predict_proba(X_test)[:, 1] if hasattr(model, "predict_proba") else None
 
-# Applying Random Forest Classifier
-Rf_Model = RandomForestClassifier(n_estimators= 100, random_state=42)
-Rf_Model.fit(X_train,Y_train)
+    # Metrics
+    accuracy = accuracy_score(Y_test, Y_pred)
+    precision = precision_score(Y_test, Y_pred)
+    recall = recall_score(Y_test, Y_pred)
+    f1 = f1_score(Y_test, Y_pred)
+    mcc = matthews_corrcoef(Y_test, Y_pred)
+    cm = confusion_matrix(Y_test, Y_pred)
+    specificity = cm[0, 0] / (cm[0, 0] + cm[0, 1])
+    roc_auc = roc_auc_score(Y_test, Y_prob) if Y_prob is not None else "N/A"
 
-# Predictions
-Y_Pred_RF =Rf_Model.predict(X_test)
-# Model evaluation
-print("Random Forest Results:")
-print("Accuracy:", accuracy_score(Y_test, Y_Pred_RF))
-print("ROC-AUC Score:", roc_auc_score(Y_test, Y_Pred_RF))
-print(classification_report(Y_test, Y_Pred_RF))
+    print(f"\n{model_name} Results:")
+    print(f"Accuracy: {accuracy:.4f}")
+    print(f"Precision: {precision:.4f}")
+    print(f"Recall: {recall:.4f}")
+    print(f"F1-Score: {f1:.4f}")
+    print(f"Specificity: {specificity:.4f}")
+    print(f"MCC: {mcc:.4f}")
+    if roc_auc != "N/A":
+        print(f"ROC-AUC Score: {roc_auc:.4f}")
+    print(classification_report(Y_test, Y_pred))
 
-# Using Support Vector Machine
 
-SVC_Model = SVC(kernel="linear", probability=True)
-SVC_Model.fit(X_train, Y_train)
+    plt.figure(figsize=(6, 4))
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
+    plt.title(f"Confusion Matrix - {model_name}")
+    plt.savefig(f"{model_name}_cm.png")
+    plt.close()
 
-Y_Pred_SVC =SVC_Model.predict(X_test)
 
-# Model evaluation
-print("SVM Results:")
-print("Accuracy:", accuracy_score(Y_test, Y_Pred_SVC))
-print("ROC-AUC Score:", roc_auc_score(Y_test, Y_Pred_SVC))
-print(classification_report(Y_test, Y_Pred_SVC))
+    if Y_prob is not None:
+        fpr, tpr, _ = roc_curve(Y_test, Y_prob)
+        roc_auc_val = auc(fpr, tpr)
+        plt.figure(figsize=(6, 4))
+        plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc_val:.2f})')
+        plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title(f'ROC Curve - {model_name}')
+        plt.legend(loc="lower right")
+        plt.savefig(f"{model_name}_roc.png")
+        plt.close()
 
-# Using XGBoost CLassifier
-XGB_Model = XGBClassifier()
-XGB_Model.fit (X_train, Y_train)
 
-# Prediction
-Y_Pred_XGB =XGB_Model.predict(X_test)
-# Model evaluation
-print("XGBoost Results:")
-print("Accuracy:", accuracy_score(Y_test,Y_Pred_XGB))
-print("ROC-AUC Score:", roc_auc_score(Y_test, Y_Pred_XGB))
-print(classification_report(Y_test, Y_Pred_XGB))
 
-# Store results in a dictionary
-model_results = {
-    "Logistic Regression": accuracy_score(Y_test, Y_Pred_LR),
-    "Random Forest": accuracy_score(Y_test, Y_Pred_RF),
-    "SVM": accuracy_score(Y_test, Y_Pred_SVC),
-    "XGBoost": accuracy_score(Y_test, Y_Pred_XGB),
+models = {
+    "Logistic Regression": (LogisticRegression(), {"C": [0.001, 0.01, 0.1, 1, 10], "solver": ["liblinear", "lbfgs"]}),
+    "Random Forest": (
+    RandomForestClassifier(random_state=42), {"n_estimators": [50, 100, 200], "max_depth": [5, 10, None]}),
+    "SVM": (SVC(kernel="linear", probability=True), {"C": [0.1, 1, 10], "kernel": ["linear", "rbf"]}),
+    "XGBoost": (XGBClassifier(eval_metric="logloss"),
+                {"n_estimators": [50, 100], "learning_rate": [0.01, 0.1], "max_depth": [3, 6]})
 }
 
-# Convert to DataFrame
-results_df = pd.DataFrame(model_results.items(), columns=["Model", "Accuracy"])
-print(results_df.sort_values(by="Accuracy", ascending=False))
 
-Param_Grid_LR = {
-    "C": [0.001, 0.01, 0.1, 1, 10],
-    "solver": ["liblinear", "lbfgs"]
-}
+skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+best_models = {}
 
-Grid_LR = GridSearchCV(LR_Model, Param_Grid_LR, cv=5,scoring="accuracy",n_jobs=-1)
-Grid_LR.fit(X_train, Y_train)
-print ("Best parameter for Logistic Regression:",Grid_LR.best_params_)
-print ("Best Accuracy:", Grid_LR.best_score_)
+for name, (model, param_grid) in models.items():
+    print(f"\nTuning {name}...")
+    grid = GridSearchCV(model, param_grid, cv=skf, scoring="accuracy", n_jobs=-1)
+    grid.fit(X_train, Y_train)
+    best_models[name] = grid.best_estimator_
 
-Best_LR = Grid_LR.best_estimator_
-Y_Pred_LR_Tuned = Best_LR.predict(X_test)
-
-print("Tuned Logistic Regression Results:")
-print("Accuracy:", accuracy_score(Y_test, Y_Pred_LR_Tuned))
-print("ROC-AUC Score:", roc_auc_score(Y_test, Y_Pred_LR_Tuned))
-print(classification_report(Y_test, Y_Pred_LR_Tuned))
+    print(f"Best Parameters for {name}:", grid.best_params_)
+    print(f"Best Cross-Validation Accuracy: {grid.best_score_:.4f}")
+    evaluate_model(grid.best_estimator_, X_test, Y_test, name)
 
 
+best_xgb = best_models["XGBoost"]
+explainer = shap.Explainer(best_xgb)
+shap_values = explainer(X_test)
 
-# Define hyperparameters for Random Forest Algorithm
-param_Grid_RF = {
-    "n_estimators": [50, 100, 200],  # Number of trees
-    "max_depth": [5, 10, 20, None],  # Depth of trees
-    "min_samples_split": [2, 5, 10],  # Minimum samples needed to split a node
-    "min_samples_leaf": [1, 2, 4],  # Minimum samples in a leaf
-    "bootstrap": [True, False]  # Use bootstrap sampling
-}
+plt.figure()
+shap.summary_plot(shap_values, X_test, plot_type="bar", show=False)
+plt.savefig("shap_summary_bar.png")
+plt.close()
 
-# Hyper parameter tuning for random forest classifier
+plt.figure()
+shap.summary_plot(shap_values, X_test, show=False)
+plt.savefig("shap_summary.png")
+plt.close()
 
-# Grid Search
-Grid_RF = GridSearchCV(Rf_Model, param_Grid_RF, cv=5, scoring="accuracy", n_jobs=-1)
-Grid_RF.fit(X_train, Y_train)
-
-# Best parameters & accuracy
-print("Best Parameters for Random Forest:", Grid_RF.best_params_)
-print("Best Accuracy:", Grid_RF.best_score_)
-
-# Train the best model
-best_RF = Grid_RF.best_estimator_
-Y_Pred_RF_tuned = best_RF.predict(X_test)
-# Evaluate performance
-print("Tuned Random Forest Results:")
-print("Accuracy:", accuracy_score(Y_test, Y_Pred_RF_tuned))
-print("ROC-AUC Score:", roc_auc_score(Y_test, Y_Pred_RF_tuned))
-print(classification_report(Y_test, Y_Pred_RF_tuned))
-
-
-# Define hyperparameter grid
-param_grid_svm = {
-    "C": [0.1, 1, 10],  # Regularization strength
-    "kernel": ["linear", "rbf"],  # Type of kernel
-    "gamma": ["scale", "auto"]  # Kernel coefficient
-}
-
-# Create model
-
-
-# Grid Search
-grid_svm = GridSearchCV(SVC_Model, param_grid_svm, cv=5, scoring="accuracy", n_jobs=-1)
-grid_svm.fit(X_train, Y_train)
-
-# Best parameters & accuracy
-print("Best Parameters for SVM:", grid_svm.best_params_)
-print("Best Accuracy:", grid_svm.best_score_)
-
-# Train the best model
-best_svm = grid_svm.best_estimator_
-y_pred_svm_tuned = best_svm.predict(X_test)
-
-# Evaluate performance
-print("Tuned SVM Results:")
-print("Accuracy:", accuracy_score(Y_test, y_pred_svm_tuned))
-print("ROC-AUC Score:", roc_auc_score(Y_test, y_pred_svm_tuned))
-print(classification_report(Y_test, y_pred_svm_tuned))
-
-
-
-# Define hyperparameter grid for XGB
-param_grid_xgb = {
-    "n_estimators": [50, 100, 200],
-    "learning_rate": [0.01, 0.1, 0.2],
-    "max_depth": [3, 6, 10],
-    "subsample": [0.7, 1.0]
-}
-
-# Create model
-xgb = XGBClassifier(eval_metric="logloss")
-
-# Grid Search
-grid_xgb = GridSearchCV(xgb, param_grid_xgb, cv=5, scoring="accuracy", n_jobs=-1)
-grid_xgb.fit(X_train, Y_train)
-
-# Best parameters & accuracy
-print("Best Parameters for XGBoost:", grid_xgb.best_params_)
-print("Best Accuracy:", grid_xgb.best_score_)
-
-# Train the best model
-best_xgb = grid_xgb.best_estimator_
-y_pred_xgb_tuned = best_xgb.predict(X_test)
-
-# Evaluate performance
-print("Tuned XGBoost Results:")
-print("Accuracy:", accuracy_score(Y_test, y_pred_xgb_tuned))
-print("ROC-AUC Score:", roc_auc_score(Y_test, y_pred_xgb_tuned))
-print(classification_report(Y_test, y_pred_xgb_tuned))
-
-
-
+with open("best_breast_cancer_model.pkl", "wb") as file:
+    pickle.dump(best_xgb, file)

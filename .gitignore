@@ -1,0 +1,28 @@
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+*.egg-info/
+
+
+.idea/
+*.iml
+
+
+Dataset/
+*.csv
+
+
+*.pkl
+
+# Logs
+*.log
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Optional: Exclude large PNGs if not needed in repo
+# *.png
